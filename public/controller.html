@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mobil Gamepad</title>
+    <style>
+        body { margin: 0; background: #111; color: white; display: flex; flex-direction: column; height: 100vh; overflow: hidden; font-family: sans-serif; user-select: none; touch-action: none; }
+        #status { text-align: center; padding: 10px; font-size: 1.2rem; background: #333; height: 30px; font-weight: bold;}
+        
+        .controls { flex: 1; display: flex; justify-content: space-between; padding: 20px; align-items: center; }
+        
+        .btn-group { display: flex; gap: 15px; }
+        
+        .btn { width: 100px; height: 100px; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; font-weight: bold; box-shadow: 0 8px 0 rgba(0,0,0,0.5); transition: transform 0.1s, box-shadow 0.1s; background: #555; border: 3px solid #777;}
+        .btn:active { transform: translateY(8px); box-shadow: 0 0 0 rgba(0,0,0,0.5); background: #777; }
+        
+        .gas { background: #28a745; border-color: #1e7e34; }
+        .gas:active { background: #1e7e34; }
+        .brake { background: #dc3545; border-color: #bd2130; }
+        .brake:active { background: #bd2130; }
+        .steer { background: #007bff; border-color: #0056b3; }
+        .steer:active { background: #0056b3; }
+    </style>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div id="status">Bağlanıyor...</div>
+    
+    <div class="controls">
+        <div class="btn-group">
+            <div class="btn steer" data-input="left">←</div>
+            <div class="btn steer" data-input="right">→</div>
+        </div>
+        
+        <div class="btn-group">
+            <div class="btn brake" data-input="brake">Fren</div>
+            <div class="btn gas" data-input="gas">Gaz</div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io({
+            transports: ['websocket'],
+            extraHeaders: { "Bypass-Tunnel-Reminder": "true" }
+        });
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomId = urlParams.get('room');
+        let playerIndex = -1;
+
+        if (roomId) socket.emit('join_room', roomId);
+
+        socket.on('joined', (index) => {
+            playerIndex = index;
+            document.getElementById('status').innerText = `Oyuncu ${index + 1}`;
+            document.getElementById('status').style.background = index === 0 ? "darkred" : "darkblue";
+        });
+
+        // OYUN BİTİŞİ (YENİLENDİ)
+        socket.on('game_ended', () => {
+            document.getElementById('status').innerText = "YARIŞ BİTTİ!";
+            document.getElementById('status').style.background = "#555";
+            
+            // Butonları gizle, teşekkür mesajı yazdır
+            const controlsDiv = document.querySelector('.controls');
+            controlsDiv.innerHTML = "<h2 style='text-align:center; width:100%; color:#aaa;'>Oynadığınız için teşekkürler!<br><br>Lütfen standı yeni yarışmacılara bırakın.</h2>";
+            
+            playerIndex = -1; // Kontrol verisi göndermeyi engelle
+        });
+
+        const buttons = document.querySelectorAll('.btn');
+        buttons.forEach(btn => {
+            const inputType = btn.getAttribute('data-input');
+            
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (playerIndex !== -1) socket.emit('input', { roomId, playerIndex, input: inputType, value: true });
+            });
+            
+            btn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                if (playerIndex !== -1) socket.emit('input', { roomId, playerIndex, input: inputType, value: false });
+            });
+        });
+    </script>
+</body>
+</html>
